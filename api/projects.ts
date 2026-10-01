@@ -1,5 +1,5 @@
-import { requireActor, json, isAdmin } from "./_lib/auth";
-import { requireDb } from "./_lib/db";
+import { requireActor, json, isAdmin } from "./_lib/auth.js";
+import { requireDb } from "./_lib/db.js";
 
 export default async function handler(request: Request): Promise<Response> {
   try {
