@@ -4,7 +4,7 @@ import { requireActor, json, isAdmin } from "./_lib/auth.js";
 import { requireDb } from "./_lib/db.js";
 
 const r2 = process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY ? new S3Client({ region: "auto", endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`, credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY } }) : null;
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   try {
     const actor = await requireActor(request); const db = requireDb(); const url = new URL(request.url); const projectId = url.searchParams.get("projectId");
     if (!projectId) return json({ error: "projectId is required" }, { status: 400 });
@@ -21,3 +21,4 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ files });
   } catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Request failed" }, { status: 500 }); }
 }
+export const GET = handler;

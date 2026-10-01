@@ -1,7 +1,7 @@
 import { requireActor, json, isAdmin } from "./_lib/auth.js";
 import { requireDb } from "./_lib/db.js";
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   try {
     const actor = await requireActor(request); const db = requireDb();
     if (request.method === "GET") {
@@ -18,3 +18,5 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ project: rows[0] }, { status: 201 });
   } catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Request failed" }, { status: 500 }); }
 }
+export const GET = handler;
+export const POST = handler;
