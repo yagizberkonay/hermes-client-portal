@@ -1,0 +1,26 @@
+import { requireActor, json, isAdmin } from "./_lib/auth.js";
+import { requireDb } from "./_lib/db.js";
+
+async function projectAllowed(db: ReturnType<typeof requireDb>, actor: any, projectId: string) {
+  const rows = isAdmin(actor) ? await db`SELECT id FROM projects WHERE id=${projectId} LIMIT 1` : await db`SELECT p.id FROM projects p JOIN clients c ON c.id=p.client_id JOIN users u ON u.id=c.user_id WHERE p.id=${projectId} AND u.auth0_sub=${actor.sub} LIMIT 1`;
+  return rows.length > 0;
+}
+async function actorId(db: ReturnType<typeof requireDb>, actor: any) { const rows = await db`SELECT id FROM users WHERE auth0_sub=${actor.sub} LIMIT 1`; return rows[0]?.id || null; }
+
+export const GET = async (request: Request) => {
+  try { const actor = await requireActor(request); const projectId = new URL(request.url).searchParams.get("projectId"); if (!projectId) return json({ error: "projectId is required" }, { status: 400 }); const db = requireDb(); if (!await projectAllowed(db, actor, projectId)) return json({ error: "Forbidden" }, { status: 403 }); const milestones = await db`SELECT id,project_id,title,description,due_date,completed_at,sort_order,status,approved_at,change_request,created_at FROM milestones WHERE project_id=${projectId} ORDER BY sort_order,created_at`; const activities = await db`SELECT a.id,a.kind,a.title,a.body,a.created_at,u.name AS actor_name FROM activities a JOIN users u ON u.id=a.actor_id WHERE a.project_id=${projectId} ORDER BY a.created_at DESC LIMIT 100`; return json({ milestones, activities }); }
+  catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Request failed" }, { status: 500 }); }
+};
+
+export const POST = async (request: Request) => {
+  try { const actor = await requireActor(request); if (!isAdmin(actor)) return json({ error: "Forbidden" }, { status: 403 }); const body = await request.json(); if (!body.projectId || !body.title) return json({ error: "projectId and title are required" }, { status: 400 }); const db = requireDb(); const rows = await db`INSERT INTO milestones (project_id,title,description,due_date,sort_order,status) VALUES (${body.projectId},${body.title},${body.description || null},${body.dueDate || null},${Number(body.sortOrder || 0)},${body.status || "not_started"}) RETURNING id,project_id,title,description,due_date,completed_at,sort_order,status,approved_at,change_request,created_at`; const uid = await actorId(db, actor); if (uid) await db`INSERT INTO activities (project_id,actor_id,kind,title,body) VALUES (${body.projectId},${uid},'milestone_created',${"Milestone created: " + body.title},${body.description || null})`; return json({ milestone: rows[0] }, { status: 201 }); }
+  catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Milestone could not be created" }, { status: 500 }); }
+};
+
+export const PATCH = async (request: Request) => {
+  try { const actor = await requireActor(request); const body = await request.json(); if (!body.id) return json({ error: "id is required" }, { status: 400 }); const db = requireDb(); const found = await db`SELECT id,project_id,title FROM milestones WHERE id=${body.id} LIMIT 1`; if (!found.length || !await projectAllowed(db, actor, found[0].project_id)) return json({ error: "Forbidden" }, { status: 403 }); const uid = await actorId(db, actor); let rows;
+    if (body.action === "approve" || body.action === "request_changes") { if (isAdmin(actor)) return json({ error: "Only the client can approve or request changes" }, { status: 403 }); const status = body.action === "approve" ? "approved" : "changes_requested"; rows = await db`UPDATE milestones SET status=${status},approved_at=${body.action === "approve" ? new Date().toISOString() : null},approved_by=${body.action === "approve" ? uid : null},change_request=${body.action === "request_changes" ? (body.changeRequest || "Changes requested by client") : null},completed_at=${body.action === "approve" ? new Date().toISOString() : null} WHERE id=${body.id} RETURNING id,project_id,title,description,due_date,completed_at,sort_order,status,approved_at,change_request,created_at`; if (uid) await db`INSERT INTO activities (project_id,actor_id,kind,title,body) VALUES (${found[0].project_id},${uid},${body.action},${body.action === "approve" ? "Milestone approved" : "Changes requested"},${body.changeRequest || null})`; }
+    else { if (!isAdmin(actor)) return json({ error: "Only admin can edit milestone" }, { status: 403 }); rows = await db`UPDATE milestones SET title=COALESCE(${body.title || null},title),description=COALESCE(${body.description || null},description),due_date=COALESCE(${body.dueDate || null},due_date),status=COALESCE(${body.status || null},status),sort_order=COALESCE(${body.sortOrder === undefined ? null : Number(body.sortOrder)},sort_order) WHERE id=${body.id} RETURNING id,project_id,title,description,due_date,completed_at,sort_order,status,approved_at,change_request,created_at`; }
+    return json({ milestone: rows[0] });
+  } catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Milestone could not be updated" }, { status: 500 }); }
+};
