@@ -8,3 +8,8 @@ export const neonClient = authUrl && dataApiUrl
   : null;
 
 export const neonConfigured = Boolean(neonClient);
+
+export async function getNeonToken(): Promise<string | null> {
+  const auth = neonClient?.auth as unknown as { getJWTToken?: () => Promise<string | null> } | undefined;
+  return auth?.getJWTToken?.() || null;
+}

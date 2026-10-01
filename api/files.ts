@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireActor, json, isAdmin } from "./_lib/auth.js";
 import { requireDb } from "./_lib/db.js";
@@ -18,7 +18,18 @@ async function handler(request: Request): Promise<Response> {
       const signedUrl = await getSignedUrl(r2, new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: found[0].storage_key }), { expiresIn: 300 });
       return json({ url: signedUrl, name: found[0].name });
     }
+    if (request.method === "POST") {
+      if (!isAdmin(actor)) return json({ error: "Forbidden" }, { status: 403 });
+      if (!r2) return json({ error: "Storage is not configured" }, { status: 503 });
+      const body = await request.json();
+      if (!body.name || !body.mimeType || !body.sizeBytes) return json({ error: "name, mimeType and sizeBytes are required" }, { status: 400 });
+      const storageKey = `projects/${projectId}/${crypto.randomUUID()}-${String(body.name).replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+      const uploadUrl = await getSignedUrl(r2, new PutObjectCommand({ Bucket: process.env.R2_BUCKET, Key: storageKey, ContentType: body.mimeType }), { expiresIn: 300 });
+      const rows = await db`INSERT INTO files (project_id,uploaded_by,name,storage_key,mime_type,size_bytes) SELECT ${projectId},u.id,${body.name},${storageKey},${body.mimeType},${Number(body.sizeBytes)} FROM users u WHERE u.auth0_sub=${actor.sub} RETURNING id,name,mime_type,size_bytes,created_at`;
+      return json({ file: rows[0], uploadUrl }, { status: 201 });
+    }
     return json({ files });
   } catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Request failed" }, { status: 500 }); }
 }
 export const GET = handler;
+export const POST = handler;
