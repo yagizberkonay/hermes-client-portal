@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Auth0Provider, useAuth0 } from "@auth0/auth0-react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { Bell, ChevronDown, CircleDollarSign, ClipboardList, CreditCard, Download, FileText, FolderOpen, LayoutDashboard, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, Search, Settings, ShieldCheck, Users, X } from "lucide-react";
+import { neonClient, neonConfigured } from "./lib/neon";
 import "./App.css";
 
 type ProjectStatus = "Discovery" | "Design" | "Development" | "Testing" | "Client Review" | "Final Delivery" | "Completed";
@@ -14,16 +15,14 @@ const activity = [
 ];
 const invoices = [{ number: "INV-2026-004", date: "20 Sep 2026", amount: "₺10,000", status: "Paid" }, { number: "INV-2026-005", date: "01 Oct 2026", amount: "₺15,000", status: "Due 14 Oct" }];
 
-function DemoLogin({ onLogin }: { onLogin: () => void }) { return <div className="login-shell"><div className="login-card"><div className="brand-mark">H</div><p className="eyebrow">HERMES SOFTWARE / CLIENT PORTAL</p><h1>Good work<br /><span>ships together.</span></h1><p className="muted">A private workspace for project progress, files, invoices and the next move.</p><button className="button button-green wide" onClick={onLogin}>ENTER PORTAL <ChevronDown size={16} /></button><small>Protected by Auth0 · demo mode until credentials are configured</small></div></div>; }
-
-function usePortalAuth() { const auth = useAuth0(); const configured = Boolean(import.meta.env.VITE_AUTH0_DOMAIN && import.meta.env.VITE_AUTH0_CLIENT_ID); return { ...auth, configured }; }
-
-function App() {
-  const configured = Boolean(import.meta.env.VITE_AUTH0_DOMAIN && import.meta.env.VITE_AUTH0_CLIENT_ID);
-  if (!configured) return <PortalApp />;
-  return <Auth0Provider domain={import.meta.env.VITE_AUTH0_DOMAIN} clientId={import.meta.env.VITE_AUTH0_CLIENT_ID} authorizationParams={{ redirect_uri: window.location.origin, audience: import.meta.env.VITE_AUTH0_AUDIENCE }}><AuthenticatedApp /></Auth0Provider>;
+function DemoLogin() {
+  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [signUp, setSignUp] = useState(false); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
+  async function submit(event: FormEvent) { event.preventDefault(); if (!neonClient) return; setLoading(true); setError(""); const result = signUp ? await neonClient.auth.signUp.email({ name: email.split("@")[0] || "Client", email, password }) : await neonClient.auth.signIn.email({ email, password }); setLoading(false); if (result.error) setError(result.error.message || "Authentication failed"); else window.location.reload(); }
+  return <div className="login-shell"><form className="login-card" onSubmit={submit}><div className="brand-mark">H</div><p className="eyebrow">HERMES SOFTWARE / CLIENT PORTAL</p><h1>Good work<br /><span>ships together.</span></h1><p className="muted">A private workspace for project progress, files, invoices and the next move.</p><label className="login-label">EMAIL<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required placeholder="you@company.com" /></label><label className="login-label">PASSWORD<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} placeholder="••••••••" /></label>{error && <p className="login-error">{error}</p>}<button className="button button-green wide" disabled={loading}>{loading ? "CONNECTING…" : signUp ? "CREATE ACCOUNT" : "ENTER PORTAL"} <ChevronDown size={16} /></button><button type="button" className="text-button login-toggle" onClick={() => setSignUp(!signUp)}>{signUp ? "Already have an account? Sign in" : "Need an account? Sign up"}</button><small>Protected by Neon Managed Auth · Better Auth</small></form></div>;
 }
-function AuthenticatedApp() { const auth = usePortalAuth(); if (auth.isLoading) return <div className="loading">LOADING HERMES PORTAL<span>_</span></div>; if (!auth.isAuthenticated) return <DemoLogin onLogin={() => auth.loginWithRedirect()} />; return <PortalApp userName={auth.user?.name || "Client"} onLogout={() => auth.logout({ logoutParams: { returnTo: window.location.origin } })} />; }
+
+function App() { if (!neonConfigured) return <PortalApp />; return <NeonAuthApp />; }
+function NeonAuthApp() { const [user, setUser] = useState<{ name?: string; email?: string } | null>(null); const [loading, setLoading] = useState(true); useEffect(() => { neonClient?.auth.getSession().then((result) => { setUser(result.data?.user || null); setLoading(false); }); }, []); if (loading) return <div className="loading">LOADING HERMES PORTAL<span>_</span></div>; if (!user) return <DemoLogin />; return <PortalApp userName={user.name || user.email || "Client"} onLogout={async () => { await neonClient?.auth.signOut(); setUser(null); }} />; }
 
 function PortalApp({ userName = "Yağız", onLogout }: { userName?: string; onLogout?: () => void }) {
   const [section, setSection] = useState("Dashboard"); const [mobileNav, setMobileNav] = useState(false); const [toast, setToast] = useState(""); const [admin, setAdmin] = useState(false);
