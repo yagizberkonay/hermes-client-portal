@@ -14,6 +14,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1143.0",
     "@neon/config": "^1.8.3",
     "@neon/env": "^1.4.8",
+    "@neondatabase/auth": "0.5.0-beta",
     "@neondatabase/neon-js": "0.7.0-beta",
     "@neondatabase/serverless": "^1.1.0",
     "jose": "^6.2.12",
