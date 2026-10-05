@@ -1,5 +1,6 @@
 import { requireActor, json, isAdmin } from "./_lib/auth.js";
 import { requireDb } from "./_lib/db.js";
+import { projectClientUserId, sendPushToUserIds } from "./_lib/push.js";
 
 const issuer = {
   legalName: "Hermes Software Bilişim Teknolojileri Anonim Şirketi",
@@ -27,7 +28,7 @@ export const POST = async (request: Request) => {
     const body = await request.json(); if (!body.projectId || !body.amount || !body.dueDate) return json({ error: "projectId, amount and dueDate are required" }, { status: 400 });
     const db = requireDb(); const number = body.number || `HS-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
     const rows = await db`INSERT INTO invoices (project_id,number,amount,status,due_date,issued_at) VALUES (${body.projectId},${number},${Number(body.amount)},${body.status || "draft"}::invoice_status,${body.dueDate},${body.issuedAt || new Date().toISOString().slice(0,10)}) RETURNING id,project_id,number,amount,status,due_date,issued_at,paid_at`;
-    return json({ invoice: rows[0], issuer }, { status: 201 });
+    const clientUserId = await projectClientUserId(body.projectId); if (clientUserId) await sendPushToUserIds([clientUserId], { title: "New invoice available", body: `Invoice ${number} is ready in your Hermes portal.`, url: "/" }).catch((error) => console.error("push invoice notification failed", error)); return json({ invoice: rows[0], issuer }, { status: 201 });
   } catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Invoice could not be created" }, { status: 500 }); }
 };
 

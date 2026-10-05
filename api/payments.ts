@@ -1,5 +1,6 @@
 import { requireActor, json, isAdmin } from "./_lib/auth.js";
 import { requireDb } from "./_lib/db.js";
+import { projectClientUserId, sendPushToUserIds } from "./_lib/push.js";
 
 export const GET = async (request: Request) => {
   try {
@@ -20,7 +21,7 @@ export const POST = async (request: Request) => {
     const actor = await requireActor(request); if (!isAdmin(actor)) return json({ error: "Forbidden" }, { status: 403 });
     const body = await request.json(); if (!body.projectId || !body.amount) return json({ error: "projectId and amount are required" }, { status: 400 });
     const db = requireDb(); const rows = await db`INSERT INTO payments (project_id,amount,currency,paid_at,method,reference,note) VALUES (${body.projectId},${Number(body.amount)},${body.currency || "TRY"},${body.paidAt || new Date().toISOString().slice(0, 10)},${body.method || "bank_transfer"}::payment_method,${body.reference || null},${body.note || null}) RETURNING id,project_id,amount,currency,paid_at,method,reference,note`;
-    return json({ payment: rows[0] }, { status: 201 });
+    const clientUserId = await projectClientUserId(body.projectId); if (clientUserId) await sendPushToUserIds([clientUserId], { title: "Payment received", body: `A payment of ${Number(body.amount).toLocaleString("tr-TR")} ${body.currency || "TRY"} was recorded for your project.`, url: "/" }).catch((error) => console.error("push payment notification failed", error)); return json({ payment: rows[0] }, { status: 201 });
   } catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Request failed" }, { status: 500 }); }
 };
 
