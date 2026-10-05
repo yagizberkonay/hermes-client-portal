@@ -17,3 +17,4 @@ body{background:var(--paper);color:var(--ink)}.portal{background:var(--paper)}.s
 .login-invite-note{color:#aaa69e;border:2px solid #444;padding:11px 12px;margin:16px 0 0;font:10px/1.5 'IBM Plex Mono',monospace;text-align:center}
 .invite-notice{margin-bottom:18px;background:var(--yellow);box-shadow:5px 5px 0 var(--orange)}.invite-notice p{margin:7px 0 12px}.invite-copy-row{display:flex;gap:10px}.invite-copy-row input{flex:1;min-width:0;border:3px solid var(--ink);background:#fffdf2;padding:11px;font:11px 'IBM Plex Mono',monospace}.invite-copy-row .button{margin:0}@media(max-width:650px){.invite-copy-row{display:grid}.invite-copy-row .button{width:100%;justify-content:center}}
 .button-orange{background:var(--orange);color:var(--ink)}
+.client-actions{display:flex;align-items:center;gap:8px}.button.compact{padding:7px 9px;font-size:9px;box-shadow:3px 3px 0 var(--ink)}.button.compact:hover{box-shadow:5px 5px 0 var(--orange)}
