@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Hermes Software mark</title>
+  <desc id="desc">Angular Hermes H mark in yellow, orange and purple on black.</desc>
+  <rect x="4" y="4" width="120" height="120" fill="#101014" stroke="#101014" stroke-width="8"/>
+  <path d="M27 24h18v28h38V24h18v80H83V70H45v34H27z" fill="#ffd447"/>
+  <path d="M45 52h38v18H45z" fill="#ff7a45"/>
+  <path d="M83 24h18v80H83z" fill="#863bff"/>
+  <path d="M27 104h18V70H27z" fill="#ff7a45"/>
+  <path d="M24 18h80" stroke="#fff8df" stroke-width="4"/>
+  <path d="M24 110h80" stroke="#fff8df" stroke-width="4"/>
+</svg>
