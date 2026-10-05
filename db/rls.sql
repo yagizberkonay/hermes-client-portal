@@ -2,6 +2,7 @@
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO authenticated;
+GRANT SELECT ON digital_approvals, approval_events TO authenticated;
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
@@ -13,6 +14,8 @@ ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE digital_approvals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE approval_events ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'users_self_select' AND tablename = 'users') THEN
@@ -44,5 +47,11 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'messages_client_select' AND tablename = 'messages') THEN
     CREATE POLICY messages_client_select ON messages FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM projects p JOIN clients c ON c.id = p.client_id JOIN users u ON u.id = c.user_id WHERE p.id = messages.project_id AND u.auth0_sub = (select auth.user_id())));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'approvals_client_select' AND tablename = 'digital_approvals') THEN
+    CREATE POLICY approvals_client_select ON digital_approvals FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM projects p JOIN clients c ON c.id = p.client_id JOIN users u ON u.id = c.user_id WHERE p.id = digital_approvals.project_id AND u.auth0_sub = (select auth.user_id())));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'approval_events_client_select' AND tablename = 'approval_events') THEN
+    CREATE POLICY approval_events_client_select ON approval_events FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM digital_approvals a JOIN projects p ON p.id = a.project_id JOIN clients c ON c.id = p.client_id JOIN users u ON u.id = c.user_id WHERE a.id = approval_events.approval_id AND u.auth0_sub = (select auth.user_id())));
   END IF;
 END $$;
