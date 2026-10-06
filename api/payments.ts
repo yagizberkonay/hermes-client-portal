@@ -19,8 +19,22 @@ export const GET = async (request: Request) => {
 export const POST = async (request: Request) => {
   try {
     const actor = await requireActor(request); if (!isAdmin(actor)) return json({ error: "Forbidden" }, { status: 403 });
-    const body = await request.json(); if (!body.projectId || !body.amount) return json({ error: "projectId and amount are required" }, { status: 400 });
-    const db = requireDb(); const rows = await db`INSERT INTO payments (project_id,amount,currency,paid_at,method,reference,note) VALUES (${body.projectId},${Number(body.amount)},${body.currency || "TRY"},${body.paidAt || new Date().toISOString().slice(0, 10)},${body.method || "bank_transfer"}::payment_method,${body.reference || null},${body.note || null}) RETURNING id,project_id,amount,currency,paid_at,method,reference,note`;
+    const body = await request.json();
+    const db = requireDb();
+    if (body.action === "remind") {
+      if (!body.projectId) return json({ error: "projectId is required" }, { status: 400 });
+      const rows = await db`SELECT p.id,p.name,p.total_price,p.monthly_minimum,c.name AS client_name,c.phone,c.user_id,COALESCE((SELECT SUM(amount) FROM payments WHERE project_id=p.id),0)::numeric(12,2) AS amount_paid FROM projects p JOIN clients c ON c.id=p.client_id WHERE p.id=${body.projectId} LIMIT 1`;
+      if (!rows.length) return json({ error: "Project not found" }, { status: 404 });
+      const project = rows[0]; const remaining = Math.max(Number(project.total_price || 0) - Number(project.amount_paid || 0), 0);
+      if (remaining <= 0) return json({ error: "This project has no outstanding balance" }, { status: 400 });
+      const amount = Number(project.monthly_minimum || 0) > 0 ? Number(project.monthly_minimum) : remaining;
+      const message = `Merhaba ${project.client_name || ""}, ${project.name} projeniz için ödeme hatırlatmasıdır. Güncel kalan bakiye: ₺${remaining.toLocaleString("tr-TR")}. Bu dönem önerilen ödeme: ₺${amount.toLocaleString("tr-TR")}. Detaylar için Hermes Software client portalını kontrol edebilirsiniz.`;
+      if (project.user_id) await sendPushToUserIds([project.user_id], { title: "Payment reminder", body: `${project.name}: ₺${remaining.toLocaleString("tr-TR")} outstanding balance.`, url: "/" }).catch((error) => console.error("push payment reminder failed", error));
+      const phone = String(project.phone || "").replace(/\D/g, "");
+      return json({ reminder: { projectId: project.id, remaining, suggestedAmount: amount, phone: project.phone || null, message, waUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : null } });
+    }
+    if (!body.projectId || !body.amount) return json({ error: "projectId and amount are required" }, { status: 400 });
+    const rows = await db`INSERT INTO payments (project_id,amount,currency,paid_at,method,reference,note) VALUES (${body.projectId},${Number(body.amount)},${body.currency || "TRY"},${body.paidAt || new Date().toISOString().slice(0, 10)},${body.method || "bank_transfer"}::payment_method,${body.reference || null},${body.note || null}) RETURNING id,project_id,amount,currency,paid_at,method,reference,note`;
     const clientUserId = await projectClientUserId(body.projectId); if (clientUserId) await sendPushToUserIds([clientUserId], { title: "Payment received", body: `A payment of ${Number(body.amount).toLocaleString("tr-TR")} ${body.currency || "TRY"} was recorded for your project.`, url: "/" }).catch((error) => console.error("push payment notification failed", error)); return json({ payment: rows[0] }, { status: 201 });
   } catch (error) { if (error instanceof Response) return error; console.error(error); return json({ error: "Request failed" }, { status: 500 }); }
 };

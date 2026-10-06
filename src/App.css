@@ -49,3 +49,4 @@ body{background:var(--paper);color:var(--ink)}.portal{background:var(--paper)}.s
   .approval-document .approval-sealed{break-inside:avoid;page-break-inside:avoid;margin-top:7mm!important;padding:4mm!important;background:#e9f9d0!important;border:1.5pt solid #111!important}
   .approval-document .panel{border:0!important}
 }
+.payment-reminder-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding-top:14px;border-top:2px solid var(--ink)}.payment-reminder-row .form-hint{margin:0}.payment-reminder-row .button{white-space:nowrap}@media(max-width:600px){.payment-reminder-row{display:block}.payment-reminder-row .button{width:100%;justify-content:center;margin-top:14px}}
