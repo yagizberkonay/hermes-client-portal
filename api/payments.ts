@@ -23,7 +23,7 @@ export const POST = async (request: Request) => {
     const db = requireDb();
     if (body.action === "remind") {
       if (!body.projectId) return json({ error: "projectId is required" }, { status: 400 });
-      const rows = await db`SELECT p.id,p.name,p.total_price,p.monthly_minimum,c.name AS client_name,c.phone,c.user_id,COALESCE((SELECT SUM(amount) FROM payments WHERE project_id=p.id),0)::numeric(12,2) AS amount_paid FROM projects p JOIN clients c ON c.id=p.client_id WHERE p.id=${body.projectId} LIMIT 1`;
+      const rows = await db`SELECT p.id,p.name,p.total_price,p.monthly_minimum,COALESCE(u.name,c.company_name,'') AS client_name,c.phone,c.user_id,COALESCE((SELECT SUM(amount) FROM payments WHERE project_id=p.id),0)::numeric(12,2) AS amount_paid FROM projects p JOIN clients c ON c.id=p.client_id LEFT JOIN users u ON u.id=c.user_id WHERE p.id=${body.projectId} LIMIT 1`;
       if (!rows.length) return json({ error: "Project not found" }, { status: 404 });
       const project = rows[0]; const remaining = Math.max(Number(project.total_price || 0) - Number(project.amount_paid || 0), 0);
       if (remaining <= 0) return json({ error: "This project has no outstanding balance" }, { status: 400 });
