@@ -36,14 +36,14 @@ export const PATCH = async (request: Request) => {
     if (body.action === "read") {
       if (body.readConfirmed !== true) return json({ error: "You must confirm that you read the complete document" }, { status: 400 });
       const readAt = new Date().toISOString();
-      const rows = await db`UPDATE digital_approvals SET read_confirmed_at=COALESCE(read_confirmed_at,${readAt}),read_by=COALESCE(read_by,${found[0].user_id}),read_ip_address=COALESCE(read_ip_address,${meta.ip}),read_user_agent=COALESCE(read_user_agent,${meta.userAgent}) WHERE id=${found[0].id} AND status='pending' RETURNING id,read_confirmed_at`;
+      const rows = await db`UPDATE digital_approvals SET read_confirmed_at=COALESCE(read_confirmed_at,${readAt}),read_by=COALESCE(read_by,${found[0].user_id}) WHERE id=${found[0].id} AND status='pending' RETURNING id,read_confirmed_at`;
       if (!rows.length) {
         const existing = await db`SELECT id,read_confirmed_at FROM digital_approvals WHERE id=${found[0].id} AND status='pending' AND read_confirmed_at IS NOT NULL LIMIT 1`;
         if (existing.length) return json({ approval: existing[0], alreadyRecorded: true });
         return json({ error: "Approval is no longer pending" }, { status: 409 });
       }
       try {
-        await db`INSERT INTO approval_events (approval_id,actor_id,event_type,metadata) SELECT ${found[0].id},${found[0].user_id},'read_confirmed',${JSON.stringify({ contentHash: found[0].content_hash, termsVersion: found[0].terms_version })}::jsonb WHERE NOT EXISTS (SELECT 1 FROM approval_events WHERE approval_id=${found[0].id} AND actor_id=${found[0].user_id} AND event_type='read_confirmed')`;
+        await db`INSERT INTO approval_events (approval_id,actor_id,event_type,metadata) SELECT ${found[0].id},${found[0].user_id},'read_confirmed',${JSON.stringify({ contentHash: found[0].content_hash, termsVersion: found[0].terms_version, recordedAt: readAt })}::jsonb WHERE NOT EXISTS (SELECT 1 FROM approval_events WHERE approval_id=${found[0].id} AND actor_id=${found[0].user_id} AND event_type='read_confirmed')`;
       } catch (auditError) {
         console.error("approval read audit logging failed", auditError);
       }
